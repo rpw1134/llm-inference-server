@@ -1,4 +1,4 @@
-## Prefill and Decode Stages of LLM Text Generation
+# Prefill and Decode Stages of LLM Text Generation
 
 ### KV-Caching
 
