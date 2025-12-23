@@ -11,7 +11,7 @@ async def read_root():
 
 def main():
     print("Starting the FastAPI server...")
-    run(app="main:app", port=8000, reload=True)
+    run(app="llm_inference_server.main:app", port=8000, reload=True)
 
 if __name__ == "__main__":
     main()
