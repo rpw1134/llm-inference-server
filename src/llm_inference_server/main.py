@@ -1,8 +1,11 @@
 from fastapi import FastAPI
 from uvicorn import run
+from llm_inference_server.routers.api import router
 
 
 app = FastAPI()
+
+app.include_router(router)
 
 @app.get("/")
 async def read_root():

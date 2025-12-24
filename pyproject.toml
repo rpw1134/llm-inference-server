@@ -10,6 +10,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.127.0",
+    "huggingface-hub>=1.2.3",
+    "llama-cpp-python>=0.3.16",
     "uvicorn>=0.40.0",
 ]
 
