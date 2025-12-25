@@ -12,7 +12,7 @@ async def get_status():
 async def get_info():
     return {"info": "LLM Inference Server API"}
 
-@router.post("/completions/chat")
+@router.post("/chat/completions")
 async def chat_completions(model_request: ModelRequestSchema):
-    response = await make_pretrained_model_request(model_request.data)
+    response = make_pretrained_model_request(model_request.data)
     return {"response": response}
