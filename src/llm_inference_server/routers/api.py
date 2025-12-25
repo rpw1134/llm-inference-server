@@ -1,6 +1,8 @@
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse, StreamingResponse
 from llm_inference_server.schemas.model import ModelRequestSchema
-from llm_inference_server.services.chat_service import make_pretrained_model_request
+from llm_inference_server.services.chat_service import make_model_request
+from typing import Generator
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -14,5 +16,7 @@ async def get_info():
 
 @router.post("/chat/completions")
 async def chat_completions(model_request: ModelRequestSchema):
-    response = make_pretrained_model_request(model_request.data)
-    return {"response": response}
+    response = make_model_request(model_request.data)
+    if isinstance(response, Generator):
+        return StreamingResponse(response, media_type="text/event-stream")
+    return JSONResponse(content={"response": response})
