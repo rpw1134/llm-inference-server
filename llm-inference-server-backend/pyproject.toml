@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "llm-inference-server"
+version = "0.1.0"
+description = "A FastAPI-based LLM inference server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.127.0",
+    "huggingface-hub>=1.2.3",
+    "llama-cpp-python>=0.3.16",
+    "psutil>=7.2.0",
+    "uvicorn>=0.40.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/llm_inference_server"]
+
+[project.scripts]
+dev = "llm_inference_server.main:main"
