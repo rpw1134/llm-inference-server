@@ -10,37 +10,126 @@ from llama_cpp import Any, Dict, Llama, CreateChatCompletionResponse
 from llm_inference_server.types.model import ModelRequest, ModelParams
 
 def get_pretrained_model_instance(repo_id: str, filename: str, model_params: ModelParams) -> Llama:
+    """
+    Load a pretrained model from HuggingFace repository.
+
+    Args:
+        repo_id: HuggingFace repository ID (e.g., "Qwen/Qwen2.5-1.5B-Instruct-GGUF")
+        filename: Model file name in the repository (e.g., "qwen2.5-1.5b-instruct-q3_k_m.gguf")
+        model_params: Model configuration parameters (context size, GPU layers, etc.)
+
+    Returns:
+        Loaded Llama model instance ready for inference
+    """
     model = Llama.from_pretrained(repo_id=repo_id, filename=filename, **model_params.__dict__)
     return model
 
 def get_local_model_instance(model_path: str, model_params: ModelParams) -> Llama:
+    """
+    Load a model from local filesystem.
+
+    Args:
+        model_path: Absolute or relative path to the model file on disk
+        model_params: Model configuration parameters (context size, GPU layers, etc.)
+
+    Returns:
+        Loaded Llama model instance ready for inference
+    """
     model = Llama(model_path=model_path, **model_params.__dict__)
     return model
 
+def get_model_instance(model_request: ModelRequest) -> Llama:
+    """
+    Load a model instance based on request configuration.
+
+    Routes to either local or pretrained model loading based on request.local flag.
+
+    Args:
+        model_request: Complete model request containing source info and parameters
+
+    Returns:
+        Loaded Llama model instance from either local filesystem or HuggingFace
+    """
+    if model_request.local:
+        return get_local_model_instance(model_request.model_path, model_request.model_params)
+    else:
+        return get_pretrained_model_instance(model_request.repo_id, model_request.filename, model_request.model_params)
+
 def make_model_request(model_request: ModelRequest) -> CreateChatCompletionResponse | Generator:
-    # Get model instance based on local or pretrained
-    model = get_pretrained_model_instance(model_request.repo_id, model_request.filename, model_request.model_params) if not model_request.local else get_local_model_instance(model_request.model_path, model_request.model_params)
-    
+    """
+    Execute a chat completion request with either streaming or non-streaming response.
+
+    Routes to appropriate handler based on model_request.stream flag.
+
+    Args:
+        model_request: Complete request including prompt, model info, and streaming preference
+
+    Returns:
+        Either a complete chat completion response dict or a generator yielding JSON chunks
+    """
     # Get response or generator based on streaming or not
-    response = create_chat_completion(model, model_request.prompt) if not model_request.stream else stream_chat_completion(model, model_request.prompt)
-    
+    response = create_chat_completion(model_request=model_request) if not model_request.stream else stream_chat_completion(model_request=model_request)
+
     # Return response or generator
     return response
 
-def create_chat_completion(model: Llama, prompt: str) -> CreateChatCompletionResponse:
+def create_chat_completion(model_request: ModelRequest) -> CreateChatCompletionResponse:
+    """
+    Generate a complete chat completion response (non-streaming).
+
+    Loads the model, processes the prompt, and returns the full completion.
+
+    Args:
+        model_request: Request containing prompt and model configuration
+
+    Returns:
+        Complete chat completion response with full generated text
+
+    Raises:
+        ValueError: If model unexpectedly returns a streaming response
+    """
+    prompt = model_request.prompt
+    model = get_model_instance(model_request)
     response = model.create_chat_completion(messages=[{"role": "user", "content": prompt}])
     print(type(response))
     if isinstance(response, Iterator):
         raise ValueError("Invalid response from model")
     return response
 
-def stream_chat_completion(model: Llama, prompt: str) -> Generator[str, None, None]:
+def stream_chat_completion(model_request: ModelRequest) -> Generator[str, None, None]:
+    """
+    Generate a streaming chat completion with real-time metrics.
+
+    Streams tokens as they're generated with performance metrics including:
+    - Tokens per second (generation speed)
+    - Time to first token (prefill latency)
+    - Memory usage delta (inference overhead)
+    - Input token processing speed
+
+    The generator yields JSON-encoded chunks in this order:
+    1. Initial chunk with input token metrics
+    2. Content chunks with each generated token and running metrics
+    3. Final chunk with complete summary statistics
+
+    Args:
+        model_request: Request containing prompt and model configuration
+
+    Yields:
+        JSON-encoded strings containing either content or metrics
+    """
+
+    # Extract prompt
+    prompt = model_request.prompt
+    
     # Before prefill time
     before_prefill_time = time()
     
     # Get process mem before model inference
     process = psutil.Process(os.getpid())
     start_memory_mb = process.memory_info().rss / (1024 * 1024)
+    
+    # Load model instance into memory
+    model = get_model_instance(model_request)
     
     # Get iterator and prefill
     stream = cast(Iterable[Dict[str, Any]], model.create_chat_completion(
@@ -53,14 +142,14 @@ def stream_chat_completion(model: Llama, prompt: str) -> Generator[str, None, No
     
     # Calculate input tokens per second
     num_prompt_tokens = len(model.tokenize(bytes(prompt, "utf-8")))
-    num_input_tokens_processed_per_second = floor(num_prompt_tokens / time_to_prefill if time_to_prefill > 0 else 0)
+    num_input_tokens_processed_per_second = num_prompt_tokens / time_to_prefill if time_to_prefill > 0 else 0
     
     # Set max model usage to 0
     max_memory_mb = 0
     
     # Get timing info
     start_time = time()
-    first_token_time = None
+    first_token_time = 0
     num_generated_tokens = 0
     
     initial_return_body = {
@@ -72,6 +161,7 @@ def stream_chat_completion(model: Llama, prompt: str) -> Generator[str, None, No
     yield f"{json.dumps(initial_return_body)}"
 
     for chunk in stream:
+        
         # Linter guardrails
         if not isinstance(chunk, dict):
             continue
@@ -91,10 +181,10 @@ def stream_chat_completion(model: Llama, prompt: str) -> Generator[str, None, No
         content = delta.get("content")
         if isinstance(content, str) and content:
             # Update metrics, return current ones
-            if first_token_time is None:
+            if first_token_time == 0:
                 first_token_time = time() - start_time
             num_generated_tokens += 1
-            tokens_per_second = floor(num_generated_tokens / (time() - start_time) if (time() - start_time) > 0 else 0)
+            tokens_per_second = num_generated_tokens / (time() - start_time) if (time() - start_time) > 0 else 0
             curr_model_memory_mb = (process.memory_info().rss / (1024 * 1024))- start_memory_mb
             max_memory_mb = max(max_memory_mb, curr_model_memory_mb)
 
@@ -102,20 +192,25 @@ def stream_chat_completion(model: Llama, prompt: str) -> Generator[str, None, No
             return_body = {
                 "content": content,
                 "num_generated_tokens": num_generated_tokens,
-                "tokens_per_second": tokens_per_second,
-                "curr_model_memory_mb": curr_model_memory_mb,
-                "first_token_time_seconds": first_token_time,
+                "tokens_per_second": round(tokens_per_second, 3),
+                "curr_model_memory_mb": round(curr_model_memory_mb, 3),
+                "first_token_time_seconds": round(first_token_time, 3),
             }
             
             yield f"{json.dumps(return_body)}"
 
+    # Final time for benchmarking
     end_time = time()
+    
+    # Clean up model from memory
+    del model
+    
     return_body = {
         "num_input_tokens_processed": num_prompt_tokens,
-        "num_input_tokens_processed_per_second": num_input_tokens_processed_per_second,
+        "num_input_tokens_processed_per_second":round(num_input_tokens_processed_per_second, 3),
         "num_generated_tokens": num_generated_tokens,
-        "total_time_seconds": end_time - start_time,
-        "first_token_time_seconds": first_token_time,
-        "max_model_memory_mb": max_memory_mb,
+        "total_time_seconds": round(end_time - start_time, 3),
+        "first_token_time_seconds": round(first_token_time, 3),
+        "max_model_memory_mb": round(max_memory_mb, 3),
     }
     yield f"{json.dumps(return_body)}"
