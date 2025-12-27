@@ -229,7 +229,7 @@ def stream_chat_completion(model_request: ModelRequest) -> Generator[str, None, 
     del model
     
     return_body = {
-        "total_time_seconds": round(end_time - start_time, 3),
+        "total_time_seconds": round(end_time - before_prefill_time, 3),
         "max_model_memory_mb": round(max_memory_mb, 3),
     }
     yield f"{json.dumps(return_body)}"

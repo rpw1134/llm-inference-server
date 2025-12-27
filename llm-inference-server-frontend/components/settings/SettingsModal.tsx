@@ -1,29 +1,118 @@
 "use client";
 
 import { CloseIcon } from "../icons/CloseIcon";
+import { TextInputField, SliderInputField } from "./InputField";
 import { ModelRequestPayload } from "../../lib/model";
 
-const numberInputs: {
+const textInputs: {
+  key: keyof Pick<ModelRequestPayload, "repo_id" | "filename" | "model_path">;
+  label: string;
+  placeholder?: string;
+  tooltip?: string;
+  helpText?: string;
+}[] = [
+  {
+    key: "repo_id",
+    label: "Hugging Face Repo ID",
+    placeholder: "Qwen/Qwen2.5-1.5B-Instruct-GGUF",
+    tooltip:
+      "HuggingFace repository ID containing the GGUF model file. Upon first request to a model, will download the model file to your local huggingface cache.",
+  },
+  {
+    key: "filename",
+    label: "Filename",
+    placeholder: "qwen2.5-1.5b-instruct-q3_k_m.gguf",
+    tooltip:
+      "Specific GGUF model file name in the repository. Upon first request to a model, will download the model file to your local huggingface cache.",
+  },
+  {
+    key: "model_path",
+    label: "Local model path",
+    placeholder: "/absolute/path/to/model.gguf",
+    tooltip:
+      "Absolute path to a local GGUF model file on disk (used when 'Use local model' is enabled)",
+  },
+];
+
+const sliderInputs: {
   key: keyof ModelRequestPayload["model_params"];
   label: string;
   min?: number;
   max?: number;
   step?: number;
+  tooltip?: string;
 }[] = [
-  { key: "n_gpu_layers", label: "GPU layers", min: -1, max: 200, step: 1 },
-  { key: "n_ctx", label: "Context length", min: 64, max: 8192, step: 64 },
-  { key: "N_batch", label: "Batch size", min: 1, max: 2048, step: 8 },
-  { key: "temperature", label: "Temperature", min: 0, max: 2, step: 0.05 },
-  { key: "top_p", label: "Top P", min: 0, max: 1, step: 0.05 },
-  { key: "top_k", label: "Top K", min: 1, max: 200, step: 1 },
+  {
+    key: "n_gpu_layers",
+    label: "GPU layers",
+    min: -1,
+    max: 200,
+    step: 1,
+    tooltip:
+      "Number of model layers to offload to GPU. Use -1 for all layers, 0 for CPU only. Adjust based on your GPU memory capacity. ",
+  },
+  {
+    key: "n_ctx",
+    label: "Context length",
+    min: 64,
+    max: 8192,
+    step: 64,
+    tooltip:
+      "Maximum context window size in tokens for the model. In the case your context window selected exceeds model capability, it will be capped to the model's maximum supported context length.",
+  },
+  {
+    key: "N_batch",
+    label: "Batch size",
+    min: 1,
+    max: 2048,
+    step: 8,
+    tooltip:
+      "Number of tokens to process in parallel during prefill and KV cache construction.",
+  },
+  {
+    key: "temperature",
+    label: "Temperature",
+    min: 0,
+    max: 2,
+    step: 0.05,
+    tooltip:
+      "Controls randomness. Lower values make output more focused and deterministic, higher values more creative and random.",
+  },
+  {
+    key: "top_p",
+    label: "Top P",
+    min: 0,
+    max: 1,
+    step: 0.05,
+    tooltip:
+      "Nucleus sampling threshold. Only tokens with cumulative probability up to this value are considered. Applied with respect to Top K outputs (redistributed probability).",
+  },
+  {
+    key: "top_k",
+    label: "Top K",
+    min: 1,
+    max: 200,
+    step: 1,
+    tooltip:
+      "Limits token selection to the K most likely tokens at each step. Applied before Top P filtering.",
+  },
   {
     key: "repeat_penalty",
     label: "Repeat penalty",
     min: 0,
     max: 2,
     step: 0.05,
+    tooltip:
+      "Penalty for repeating tokens. Higher values reduce repetition in the output.",
   },
-  { key: "max_tokens", label: "Max tokens", min: 32, max: 4096, step: 16 },
+  {
+    key: "max_tokens",
+    label: "Max tokens",
+    min: 32,
+    max: 4096,
+    step: 16,
+    tooltip: "Maximum number of tokens to generate in the response.",
+  },
 ];
 
 type SettingsModalProps = {
@@ -41,20 +130,6 @@ export function SettingsModal({
 }: SettingsModalProps) {
   if (!open) return null;
 
-  const handleParamChange = (
-    key: keyof ModelRequestPayload["model_params"],
-    raw: string
-  ) => {
-    const parsed = Number(raw);
-    onChange({
-      ...value,
-      model_params: {
-        ...value.model_params,
-        [key]: Number.isNaN(parsed) ? value.model_params[key] : parsed,
-      },
-    });
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div className="relative w-full max-w-5xl rounded-3xl border border-neutral-800 bg-neutral-950 p-6 shadow-2xl shadow-black/60">
@@ -69,15 +144,11 @@ export function SettingsModal({
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-500">
-              Model request
+              Inference Request
             </p>
-            <h2 className="text-xl font-semibold text-neutral-50">
-              Tune inference parameters
+            <h2 className="text-xl font-semibold text-neutral-50 mt-2">
+              Tune Inference Parameters
             </h2>
-            <p className="text-sm text-neutral-400">
-              Mirror of the backend ModelRequest. Every change is saved for the
-              next request.
-            </p>
           </div>
           <div className="flex items-center gap-3 rounded-2xl border border-neutral-800 bg-neutral-900/75 px-4 py-3 text-xs text-neutral-300">
             <div className="flex items-center gap-2">
@@ -111,44 +182,34 @@ export function SettingsModal({
         <div className="grid gap-4 md:grid-cols-3">
           <div className="md:col-span-2 space-y-3 rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="space-y-2 text-sm font-medium text-neutral-200">
-                <span className="block text-neutral-300">Repo ID</span>
-                <input
-                  className="w-full rounded-xl border border-neutral-800 bg-neutral-950 p-3 text-sm text-neutral-50 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20"
-                  value={value.repo_id}
-                  onChange={(e) =>
-                    onChange({ ...value, repo_id: e.target.value })
+              {textInputs.slice(0, 2).map((input) => (
+                <TextInputField
+                  key={input.key}
+                  label={input.label}
+                  value={value[input.key]}
+                  onChange={(newValue) =>
+                    onChange({ ...value, [input.key]: newValue })
                   }
-                  placeholder="Qwen/Qwen2.5-1.5B-Instruct-GGUF"
+                  placeholder={input.placeholder}
+                  tooltip={input.tooltip}
+                  disabled={value.local}
                 />
-              </label>
-              <label className="space-y-2 text-sm font-medium text-neutral-200">
-                <span className="block text-neutral-300">Filename</span>
-                <input
-                  className="w-full rounded-xl border border-neutral-800 bg-neutral-950 p-3 text-sm text-neutral-50 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20"
-                  value={value.filename}
-                  onChange={(e) =>
-                    onChange({ ...value, filename: e.target.value })
-                  }
-                  placeholder="qwen2.5-1.5b-instruct-q3_k_m.gguf"
-                />
-              </label>
+              ))}
             </div>
-            <label className="space-y-2 text-sm font-medium text-neutral-200">
-              <span className="block text-neutral-300">Local model path</span>
-              <input
-                className="w-full rounded-xl border border-neutral-800 bg-neutral-950 p-3 text-sm text-neutral-50 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20"
-                value={value.model_path}
-                onChange={(e) =>
-                  onChange({ ...value, model_path: e.target.value })
+            {textInputs.slice(2).map((input) => (
+              <TextInputField
+                key={input.key}
+                label={input.label}
+                value={value[input.key]}
+                onChange={(newValue) =>
+                  onChange({ ...value, [input.key]: newValue })
                 }
-                placeholder="/models/llama.bin (used when Local is on)"
+                placeholder={input.placeholder}
+                tooltip={input.tooltip}
+                helpText={input.helpText}
+                disabled={!value.local}
               />
-              <p className="text-xs font-normal text-neutral-500">
-                When local is enabled, repo_id and filename are ignored and
-                model_path is used instead.
-              </p>
-            </label>
+            ))}
           </div>
 
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900/70 p-4 text-sm text-neutral-200">
@@ -181,36 +242,25 @@ export function SettingsModal({
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {numberInputs.map((input) => (
-            <label
+          {sliderInputs.map((input) => (
+            <SliderInputField
               key={input.key}
-              className="space-y-2 rounded-xl border border-neutral-800 bg-neutral-900/80 p-3"
-            >
-              <div className="flex items-center justify-between text-sm text-neutral-200">
-                <span>{input.label}</span>
-                <span className="text-xs text-neutral-500">
-                  {value.model_params[input.key]}
-                </span>
-              </div>
-              <input
-                type="range"
-                min={input.min}
-                max={input.max}
-                step={input.step}
-                value={value.model_params[input.key]}
-                onChange={(e) => handleParamChange(input.key, e.target.value)}
-                className="w-full accent-orange-400"
-              />
-              <input
-                type="number"
-                min={input.min}
-                max={input.max}
-                step={input.step}
-                value={value.model_params[input.key]}
-                onChange={(e) => handleParamChange(input.key, e.target.value)}
-                className="w-full rounded-lg border border-neutral-800 bg-neutral-950 p-2 text-sm text-neutral-50 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20"
-              />
-            </label>
+              label={input.label}
+              value={value.model_params[input.key]}
+              onChange={(newValue) =>
+                onChange({
+                  ...value,
+                  model_params: {
+                    ...value.model_params,
+                    [input.key]: newValue,
+                  },
+                })
+              }
+              min={input.min}
+              max={input.max}
+              step={input.step}
+              tooltip={input.tooltip}
+            />
           ))}
         </div>
       </div>
