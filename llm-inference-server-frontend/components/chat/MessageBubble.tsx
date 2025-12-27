@@ -4,9 +4,9 @@ type ChatMessageProps = {
 };
 
 const roleStyles: Record<ChatMessageProps["role"], string> = {
-  user: "bg-slate-800 text-slate-50 border border-slate-700",
-  assistant: "bg-white/5 text-slate-50 border border-slate-800",
-  system: "bg-amber-100/10 text-amber-50 border border-amber-200/30",
+  user: "bg-neutral-900 text-slate-50 border border-neutral-700",
+  assistant: "bg-black/40 text-slate-50 border border-neutral-800",
+  system: "bg-orange-500/10 text-orange-50 border border-orange-400/40",
 };
 
 const roleLabel: Record<ChatMessageProps["role"], string> = {

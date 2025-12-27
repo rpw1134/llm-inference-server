@@ -21,10 +21,10 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex w-full items-end gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 shadow-lg shadow-slate-950/50"
+      className="flex w-full items-end gap-3 rounded-2xl border border-slate-800 bg-neutral-950/70 p-4 shadow-lg shadow-black/50"
     >
       <textarea
-        className="min-h-[80px] flex-1 resize-none rounded-xl border border-slate-800 bg-slate-950/70 p-3 text-sm text-slate-50 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20"
+        className="min-h-[80px] flex-1 resize-none rounded-xl border border-slate-800 bg-neutral-950/90 p-3 text-sm text-slate-50 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20"
         placeholder="Ask anything about your model…"
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -33,7 +33,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
       <button
         type="submit"
         disabled={disabled || !value.trim()}
-        className="h-11 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-400 px-4 text-sm font-semibold text-white shadow-md transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-11 rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 px-4 text-sm font-semibold text-white shadow-md transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
       >
         Send
       </button>

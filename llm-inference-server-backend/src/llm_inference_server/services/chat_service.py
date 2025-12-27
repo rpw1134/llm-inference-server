@@ -1,13 +1,12 @@
 import json
 import os
 from time import time
-from math import floor
-from typing import Generator, Iterable, Iterator, cast
+from typing import Any, Dict, Generator, Iterable, Iterator, cast
 
 import psutil
-from llama_cpp import Any, Dict, Llama, CreateChatCompletionResponse
+from llama_cpp import Llama
 
-from llm_inference_server.types.model import ModelRequest, ModelParams
+from llm_inference_server.types.model import ChatCompletionResponse, ModelRequest, ModelParams, StreamChunk
 
 def get_pretrained_model_instance(repo_id: str, filename: str, model_params: ModelParams) -> Llama:
     """
@@ -55,7 +54,7 @@ def get_model_instance(model_request: ModelRequest) -> Llama:
     else:
         return get_pretrained_model_instance(model_request.repo_id, model_request.filename, model_request.model_params)
 
-def make_model_request(model_request: ModelRequest) -> CreateChatCompletionResponse | Generator:
+def make_model_request(model_request: ModelRequest) -> ChatCompletionResponse | Generator[str, None, None]:
     """
     Execute a chat completion request with either streaming or non-streaming response.
 
@@ -65,7 +64,7 @@ def make_model_request(model_request: ModelRequest) -> CreateChatCompletionRespo
         model_request: Complete request including prompt, model info, and streaming preference
 
     Returns:
-        Either a complete chat completion response dict or a generator yielding JSON chunks
+        Either a ChatCompletionResponse with content and metrics or a generator yielding JSON chunks
     """
     # Get response or generator based on streaming or not
     response = create_chat_completion(model_request=model_request) if not model_request.stream else stream_chat_completion(model_request=model_request)
@@ -73,28 +72,52 @@ def make_model_request(model_request: ModelRequest) -> CreateChatCompletionRespo
     # Return response or generator
     return response
 
-def create_chat_completion(model_request: ModelRequest) -> CreateChatCompletionResponse:
+def create_chat_completion(model_request: ModelRequest) -> ChatCompletionResponse:
     """
     Generate a complete chat completion response (non-streaming).
 
-    Loads the model, processes the prompt, and returns the full completion.
+    Loads the model, processes the prompt, and returns the full completion with metrics.
 
     Args:
         model_request: Request containing prompt and model configuration
 
     Returns:
-        Complete chat completion response with full generated text
+        ChatCompletionResponse containing:
+            - content: Generated response text
+            - prompt_tokens: Number of tokens in the prompt
+            - completion_tokens: Number of tokens in the completion
+            - total_tokens: Total tokens used
+            - time_taken_seconds: Time taken to generate the response
 
     Raises:
         ValueError: If model unexpectedly returns a streaming response
     """
     prompt = model_request.prompt
     model = get_model_instance(model_request)
+
+    # Track start time
+    start_time = time()
+
     response = model.create_chat_completion(messages=[{"role": "user", "content": prompt}])
-    print(type(response))
+
+    # Track end time
+    end_time = time()
+    time_taken = end_time - start_time
+
     if isinstance(response, Iterator):
         raise ValueError("Invalid response from model")
-    return response
+
+    # Extract content and metrics
+    content = response["choices"][0]["message"]["content"]
+    usage = response["usage"]
+
+    return ChatCompletionResponse(
+        content=content,
+        prompt_tokens=usage["prompt_tokens"],
+        completion_tokens=usage["completion_tokens"],
+        total_tokens=usage["total_tokens"],
+        time_taken_seconds=round(time_taken, 3),
+    )
 
 def stream_chat_completion(model_request: ModelRequest) -> Generator[str, None, None]:
     """
@@ -206,11 +229,7 @@ def stream_chat_completion(model_request: ModelRequest) -> Generator[str, None, 
     del model
     
     return_body = {
-        "num_input_tokens_processed": num_prompt_tokens,
-        "num_input_tokens_processed_per_second":round(num_input_tokens_processed_per_second, 3),
-        "num_generated_tokens": num_generated_tokens,
         "total_time_seconds": round(end_time - start_time, 3),
-        "first_token_time_seconds": round(first_token_time, 3),
         "max_model_memory_mb": round(max_memory_mb, 3),
     }
     yield f"{json.dumps(return_body)}"

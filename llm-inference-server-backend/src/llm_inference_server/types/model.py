@@ -22,3 +22,22 @@ class ModelParams:
     repeat_penalty: float = 1.1
     max_tokens: int = 2048
     
+@dataclass
+class ChatCompletionResponse:
+    content: str | None
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    total_tokens: int | None
+    time_taken_seconds: float | None
+
+@dataclass
+class StreamChunk:
+    num_input_tokens_processed: int | None = None
+    num_input_tokens_processed_per_second: float | None = None
+    content: str | None = None
+    num_generated_tokens: int | None = None
+    tokens_per_second: float | None = None
+    curr_model_memory_mb: float | None = None
+    first_token_time_seconds: float | None = None
+    total_time_seconds: float | None = None
+    max_model_memory_mb: float | None = None
