@@ -21,10 +21,10 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex w-full items-end gap-3 rounded-2xl border border-slate-800 bg-neutral-950/70 p-4 shadow-lg shadow-black/50"
+      className="flex w-full items-end gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/75 p-4 shadow-lg shadow-black/50"
     >
       <textarea
-        className="min-h-[80px] flex-1 resize-none rounded-xl border border-slate-800 bg-neutral-950/90 p-3 text-sm text-slate-50 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20"
+        className="min-h-[80px] flex-1 resize-none rounded-xl border border-neutral-800 bg-neutral-950/90 p-3 text-sm text-neutral-50 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20"
         placeholder="Ask anything about your model…"
         value={value}
         onChange={(e) => setValue(e.target.value)}

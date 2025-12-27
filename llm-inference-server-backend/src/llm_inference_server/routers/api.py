@@ -51,4 +51,4 @@ async def chat_completions(model_request: ModelRequestSchema):
     response = make_model_request(model_request.data)
     if isinstance(response, Generator):
         return StreamingResponse(response, media_type="text/event-stream")
-    return JSONResponse(content={"response": response})
+    return JSONResponse(content={"response": response.__dict__})
