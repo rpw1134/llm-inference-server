@@ -20,6 +20,10 @@ Note here, hashes depending on previous blocks ensures that changing any block a
 
 As described above, prompt caching essentially searches for the longest cached prefix. Any change to your prompt will result in cache misses after your change.
 
+### RAG Applications
+
+RAG benefits particularly well from prompt caching. Returned documents, if returned in the same order, may hit cache often.
+
 ### Conclusions
 
 An incresibly powerful technique.
