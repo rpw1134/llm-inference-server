@@ -88,7 +88,7 @@ cd llm-inference-server-backend
 2. Install dependencies using uv:
 
 ```bash
-uv install
+uv sync
 ```
 
 3. Start the development server:
@@ -108,10 +108,9 @@ cd llm-inference-server-frontend
 ```
 
 2. Install dependencies:
-
-```bash
-npm install
-```
+  ```bash
+  npm install
+  ```
 
 3. Start the development server:
 
